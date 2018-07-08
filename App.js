@@ -1,20 +1,20 @@
 import React from 'react'
 import { StyleSheet, Text, View, Button } from 'react-native'
-import firebase, { auth } from './firebase.js';
+import firebase, { auth } from './firebase.js'
 
 export default class App extends React.Component {
   constructor() {
     super()
 
-    this.logginUser = this.logginUser.bind(this)
+    this.loginUser = this.loginUser.bind(this)
 
     let me
-    firebase.auth().signInAnonymously().catch(function(error) {
+    firebase.auth().signInAnonymously().catch((error) => {
       var errorCode = error.code
       var errorMessage = error.message
     })
 
-    firebase.auth().onAuthStateChanged(function(user) {
+    firebase.auth().onAuthStateChanged((user) => {
       if (user) {
         // User is signed in.
         var isAnonymous = user.isAnonymous
@@ -33,15 +33,26 @@ export default class App extends React.Component {
     }
   }
 
-  logginUser() {
+  changeStatus(userId, status) {
+  const db = firebase.database()
+  db.ref('users/' + userId).set({
+    status: true
+  })
+}
+
+  loginUser() {
     const auth = firebase.auth()
-    const currentUser = auth.currentUser
+    const currentUser = auth.currentUser 
+    const db = firebase.database()
 
     currentUser.updateProfile({
       displayName: 'Michael',
     }).then(function() {
-      console.log(currentUser.displayName)
+      console.log(currentUser)
 
+      db.ref('users').set({
+        userId: currentUser.uid
+      })
       this.setState({
         me: currentUser
       })
@@ -64,11 +75,11 @@ export default class App extends React.Component {
         buds
       })
     }
-
     console.log('status button clicked ', this.state.buds)
   }
 
   render() {
+    console.log(this.itemsRef)
     const me = this.state.me
 
     return (
@@ -98,7 +109,7 @@ export default class App extends React.Component {
           :
             <View style={styles.button}>
               <Button
-                onPress={e => this.logginUser()}
+                onPress={e => this.loginUser()}
                 title='Login'
                 color='#292C3F'
                 accessibilityLabel='Click this button to let everyone know that your down for gaming tonight'
@@ -118,7 +129,6 @@ export default class App extends React.Component {
             })}
           </View>
         }
-
       </View>
     )
   }
