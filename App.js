@@ -5,131 +5,181 @@ import firebase, { auth } from './firebase.js'
 export default class App extends React.Component {
   constructor() {
     super()
-
     this.loginUser = this.loginUser.bind(this)
 
-    let me
-    firebase.auth().signInAnonymously().catch((error) => {
-      var errorCode = error.code
-      var errorMessage = error.message
-    })
-
-    firebase.auth().onAuthStateChanged((user) => {
-      if (user) {
-        // User is signed in.
-        var isAnonymous = user.isAnonymous
-        var uid = user.uid
-        me = user
-      } else {
-        // User is signed out.
-        me = user
-        console.log('no user logged in')
-      }
-    })
-
     this.state = {
-      me,
-      buds: ['Klein', 'Jackson', 'JV']
+      authed: false,
+      buds: {},
+      me: {}
     }
   }
 
-  changeStatus(userId, status) {
-  const db = firebase.database()
-  db.ref('users/' + userId).set({
-    status: true
-  })
-}
+  componentDidMount () {
+    const auth = firebase.auth()
+    const db = firebase.database()
+
+    auth.signInAnonymously().catch((error) => {
+      const errorCode = error.code
+      const errorMessage = error.message
+    })
+
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        // User is signed in
+        let me
+        const authed = true
+        console.log(user.displayName + ' logged in')
+
+        const eventref = db.ref('buds/')
+        const snapshot = await eventref.once('value')
+        const buds = snapshot.val()
+
+        if (buds.hasOwnProperty(user.uid)) {
+          me = buds[user.uid]
+          me.uid = user.uid // adds uid to user object
+        }
+
+        this.setState({
+          authed,
+          buds,
+          me
+        })
+      } else {
+        // User is signed out
+        console.log('no user logged in')
+
+        this.setState({
+          authed: false,
+          buds: {},
+          me: {}
+        })
+      }
+    })
+  }
+
+  async buttonClickHandler(me) {
+    // const { buds } = this.state
+
+    // if (!buds.hasOwnProperty(me.uid)) {
+    //   await this.setState(previousState => ({
+    //     buds: [...previousState.buds, me]
+    //   }))
+    // } else {
+    //   const buddies = [...buds]
+    //   const index = buddies.indexOf(me.displayName)
+    //   buddies.splice(index, 1)
+    //   await this.setState({
+    //     buds: buddies
+    //   })
+    // }
+
+    // if (budsObject) {
+      // Builds up array of firebase users
+      // for (const key of Object.keys(budsObject)) {
+      //   if (budsObject[key].status) {
+      //     buds.push(budsObject[key].name)
+      //   }
+      // }
+    // Update firebase
+    this.changeStatus(me)
+  }
+
+  async changeStatus(me) {
+    const db = firebase.database()
+    const eventref = db.ref('buds/' + me.uid + '/status')
+    const snapshot = await eventref.once('value')
+
+    let status
+    status = snapshot.val()
+
+    // Toggle status
+    status = !status
+    me.status = status
+    console.log('MY STATUS ', status)
+    
+    db.ref('buds/' + me.uid).update({
+      status
+    }).then(
+      this.setState({
+        me
+      })
+    )
+  }
 
   loginUser() {
     const auth = firebase.auth()
-    const currentUser = auth.currentUser 
+    const currentUser = auth.currentUser
     const db = firebase.database()
 
-    currentUser.updateProfile({
-      displayName: 'Michael',
-    }).then(function() {
-      console.log(currentUser)
-
-      db.ref('users').set({
-        userId: currentUser.uid
-      })
-      this.setState({
-        me: currentUser
-      })
-    }.bind(this), function(error) {
-      // An error happened.
-      console.log('User wasn’t updated')
+    db.ref('buds/' + currentUser.uid).set({
+      name: currentUser.name,
+      status: false
+    })
+    this.setState({
+      me: currentUser
     })
   }
 
-  async buttonClickHandler(newBud) {
-    if (!this.state.buds.includes(newBud)) {
-      await this.setState(previousState => ({
-        buds: [...previousState.buds, newBud]
-      }))
-    } else {
-      const buds = [...this.state.buds]
-      const index = buds.indexOf(newBud)
-      buds.splice(index, 1)
-      await this.setState({
-        buds
-      })
-    }
-    console.log('status button clicked ', this.state.buds)
-  }
-
   render() {
-    console.log(this.itemsRef)
-    const me = this.state.me
+    const { authed, buds, me } = this.state
 
-    return (
-      <View style={styles.container}>
+    console.log('RENDER STATUS ', me.status)
 
-      {me &&
-        <View style={styles.headerArea}>
-          <Text style={styles.name}>
-            Yo, {me.displayName}!
-          </Text>
-          <Text style={styles.headline}>
-            You down for games tonight?
-          </Text>
-        </View>
-      }
-
-        <View style={styles.buttonArea}>
-          {me ?
-            <View style={styles.button}>
-              <Button
-                onPress={e => this.buttonClickHandler(me.displayName)}
-                title={this.state.buds.includes(me.displayName) ? 'I’m Out' : 'I’m Down'}
-                color='#292C3F'
-                accessibilityLabel='Click this button to let everyone know that your down for gaming tonight'
-              />
-            </View>
-          :
-            <View style={styles.button}>
-              <Button
-                onPress={e => this.loginUser()}
-                title='Login'
-                color='#292C3F'
-                accessibilityLabel='Click this button to let everyone know that your down for gaming tonight'
-              />
+    if (authed) {
+      return (
+        <View style={styles.container}>
+          {me &&
+            <View style={styles.headerArea}>
+              <Text style={styles.name}>
+                Yo, {me.name}!
+              </Text>
+              <Text style={styles.headline}>
+                You down for games tonight?
+              </Text>
             </View>
           }
-        </View>
 
-        {me &&
-          <View style={styles.budsArea}>
-            {this.state.buds.map(bud => {
-              return (
-                <View style={styles.bud} key={bud}>
-                  <Text>{bud}</Text>
-                </View>
-              )
-            })}
+          <View style={styles.buttonArea}>
+            {me ?
+              <View style={styles.button}>
+                <Button
+                  onPress={e => this.buttonClickHandler(me)}
+                  title={me.status ? 'I’m Out' : 'I’m Down'}
+                  color='#292C3F'
+                  accessibilityLabel='Click this button to let everyone know that your down for gaming tonight'
+                />
+              </View>
+            :
+              <View style={styles.button}>
+                <Button
+                  onPress={e => this.loginUser()}
+                  title='Login'
+                  color='#292C3F'
+                  accessibilityLabel='Click this button to let everyone know that your down for gaming tonight'
+                />
+              </View>
+            }
           </View>
-        }
-      </View>
+
+          {/* me &&
+            <View style={styles.budsArea}>
+              {buds.map(bud => {
+                return (
+                  <View style={styles.bud} key={bud}>
+                    <Text>{bud}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          */}
+        </View>
+      )
+    }
+
+    return (
+     <View style={styles.container}>
+      <Text>Loading...</Text>
+     </View>
     )
   }
 }
