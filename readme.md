@@ -1,11 +1,11 @@
-# Gamenight App
+# Game Night App
 ## https://github.com/michaelwschultz/gamenight
 #### Built by Michael Schultz https://michaelschultz.com
 App for letting your friends know you're down to game tonight. Initial idea by @kleinmaetschke.
 
 ![app screenshot](gamenight-screenshot.png)
 
-Gamenight is built with React Native for iOS and Android.
+Game Night is built with React Native for iOS and Android.
 
 ---
 

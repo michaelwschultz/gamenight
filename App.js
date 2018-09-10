@@ -1,6 +1,29 @@
 import React from 'react'
-import { StyleSheet, Text, View, Button, TextInput } from 'react-native'
+import { Animated, Button, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import posed from 'react-native-pose'
 import firebase, { auth } from './firebase.js'
+
+// These constants need to be set before componentDidMount
+// TODO should be moved to a function rather than floating out here
+const TWEEN = ({ value, toValue, useNativeDriver }) =>
+  Animated.timing(value, {
+    toValue,
+    useNativeDriver,
+    duration: 1000,
+  })
+const CONFIG = {
+  bright: {
+    shadowRadius: 10,
+    shadowOpacity: 1,
+    transition: TWEEN
+  },
+  dim: {
+    shadowRadius: 8,
+    shadowOpacity: 0.3,
+    transition: TWEEN
+  }
+}
+const BLINKINGDOT = posed.View(CONFIG)
 
 export default class App extends React.Component {
   constructor() {
@@ -11,11 +34,12 @@ export default class App extends React.Component {
       buds: {},
       me: {},
       name: '',
-      registered: false
+      registered: false,
+      isBright: true
     }
   }
 
-  componentDidMount () {
+  componentDidMount() {
     const auth = firebase.auth()
     const db = firebase.database()
 
@@ -29,7 +53,7 @@ export default class App extends React.Component {
         // User is signed in
         let me
         const authed = true
-        console.log(user + ' authed')
+        console.log(JSON.stringify(user) + ' authed')
 
         const eventref = db.ref('buds/')
         const snapshot = await eventref.once('value')
@@ -67,6 +91,11 @@ export default class App extends React.Component {
         buds: snapshot.val()
       })
     }.bind(this))
+
+    // Blink status dot next to each bud
+    setInterval(() => {
+      this.setState({ isBright: !this.state.isBright })
+    }, 1000)
   }
 
   signOut(me) {
@@ -127,15 +156,97 @@ export default class App extends React.Component {
     })
   }
 
+  renderNavigation(me, registered) {
+    return (
+      <View>
+        <StatusBar
+          barStyle='light-content'
+        />
+        <View style={styles.navigationArea}>
+          <View style={styles.navAffordance} />
+          <View style={styles.navAffordance}>
+            <Text style={styles.navigationText}>
+              Game Night
+            </Text>
+          </View>
+          <View style={styles.navAffordance}>
+            <TouchableOpacity
+              style={styles.accountButton}
+              onPress={e => this.signOut(me)}
+            >
+              <Text style={[styles.buttonText, { textAlign: 'right', color: '#474747', fontSize: 14 }]}>
+                {me && registered ? 'Sign Out' : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    )
+  }
+
+  renderHeadline(me) {
+    return (
+      <View style={styles.headlineArea}>
+        <Text style={styles.name}>
+          Yo, {me.name}!
+        </Text>
+        <Text style={styles.headline}>
+          You down for games tonight?
+        </Text>
+      </View>
+    )
+  }
+
+  renderPrompt(me, registered) {
+    return (
+      <View style={styles.cta}>
+        {registered && me && this.renderHeadline(me)}
+        <View style={styles.buttonArea}>
+          {registered && me ?
+            <TouchableOpacity
+              style={[styles.button, me.status ? styles.budStatusOut : styles.budStatusDown]}
+              onPress={e => this.changeStatus(me)}
+            >
+              <Text style={styles.buttonText}>
+                {me.status ? 'I’m Out' : 'I’m Down'}
+              </Text>
+            </TouchableOpacity>
+          :
+            <View>
+              <TextInput
+                style={{ color: '#FFFFFF', height: 56, borderColor: '#474747', borderWidth: 1, borderRadius: 6 }}
+                onChangeText={(name) => this.setState({name})}
+                defaultValue={this.state.name}
+              />
+              <View style={styles.button}>
+                <Button
+                  onPress={e => this.registerUser(this.state.name)}
+                  disabled={!this.state.name}
+                  title='Register'
+                  style={styles.registerButton}
+                  accessibilityLabel='Click this button to let everyone know that your down for gaming tonight'
+                />
+              </View>
+            </View>
+          }
+        </View>
+      </View>
+    )
+  }
+
   renderBuds() {
-    const { buds } = this.state
+    const { buds, isBright } = this.state
     const budsArray = []
 
     for (const key of Object.keys(buds)) {
       if (buds[key].status) {
         budsArray.push(
           <View style={styles.bud} key={`${buds[key].uid}-bud`}>
-            <Text>{buds[key].name}</Text>
+            <BLINKINGDOT
+              pose={isBright ? 'bright' : 'dim'}
+              style={[styles.budStatusLight, styles.budStatusDown]}
+            />
+            <Text style={[styles.budText, styles.budInactive]}>{buds[key].name}</Text>
           </View>
         )
       }
@@ -149,60 +260,15 @@ export default class App extends React.Component {
     if (authed) {
       return (
         <View style={styles.container}>
-          {registered && me &&
-            <View style={styles.headerArea}>
-              <Text style={styles.name}>
-                Yo, {me.name}!
-              </Text>
-              <Text style={styles.headline}>
-                You down for games tonight?
-              </Text>
-              <View style={styles.button}>
-                <Button
-                  onPress={e => this.signOut(me)}
-                  title='Sign out'
-                  color='#292C3F'
-                  accessibilityLabel='Tap to sign out'
-                />
-              </View>
-            </View>
-          }
-
-          <View style={styles.buttonArea}>
-            {registered && me ?
-              <View style={styles.button}>
-                <Button
-                  onPress={e => this.changeStatus(me)}
-                  title={me.status ? 'I’m Out' : 'I’m Down'}
-                  color='#292C3F'
-                  accessibilityLabel='Tap to let everyone know that your down for gaming tonight'
-                />
-              </View>
-            :
-              <View>
-                <TextInput
-                  style={{height: 40, borderColor: 'gray', borderWidth: 1}}
-                  onChangeText={(name) => this.setState({name})}
-                  defaultValue={this.state.name}
-                />
-                <View style={styles.button}>
-                  <Button
-                    onPress={e => this.registerUser(this.state.name)}
-                    disabled={!this.state.name}
-                    title='Register'
-                    color='#292C3F'
-                    accessibilityLabel='Click this button to let everyone know that your down for gaming tonight'
-                  />
-                </View>
-              </View>
-            }
-          </View>
-
+          {this.renderNavigation(me, registered)}
           {registered && me &&
             <View style={styles.budsArea}>
-              {this.renderBuds()}
+              <ScrollView contentContainerStyle={styles.budsScrollView}>
+                {this.renderBuds()}
+              </ScrollView>
             </View>
           }
+          {this.renderPrompt(me, registered)}
         </View>
       )
     }
@@ -218,14 +284,33 @@ export default class App extends React.Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 40,
-    backgroundColor: '#292C3F',
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerArea: {
+  navigationArea: {
+    flexDirection: 'row',
+    width: '100%',
+    marginTop: 56,
+    marginBottom: 24,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  navAffordance: {
     flex: 1,
+    justifyContent: 'space-evenly',
+  },
+  navigationText: {
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  headlineArea: {
     justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    width: '100%',
   },
   headline: {
     color: '#FFFFFF',
@@ -233,37 +318,73 @@ const styles = StyleSheet.create({
   },
   name: {
     color: '#FFFFFF',
-    fontSize: 32,
-  },
-  buttonArea: {
-    flex: 1,
-    justifyContent: 'center',
+    fontSize: 24,
   },
   nameInput: {
    flex: 1,
    justifyContent: 'center',
    backgroundColor: '#292C3F'
   },
+  cta: {
+    flex: 2,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  buttonArea: {
+    flex: 1,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
   button: {
-    backgroundColor: '#F98C63',
+    width: '100%',
+    padding: 24,
+    alignItems: 'center',
     borderRadius: 6,
-    paddingTop: 16,
-    paddingRight: 24,
-    paddingBottom: 16,
-    paddingLeft: 24,
+    shadowRadius: 20,
+    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 19,
   },
   budsArea: {
+    flex: 4,
+    width: '100%',
+  },
+  budsScrollView: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 16,
   },
   bud: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 100,
-    backgroundColor: '#FFFFFF',
-    width: 72,
-    height: 72,
-    margin: 8,
+    marginTop: 32,
   },
+  budText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  budInactive: {
+    color: '#474747',
+  },
+  budStatusLight: {
+    width: 16,
+    height: 16,
+    marginRight: 16,
+    borderRadius: 100,
+    backgroundColor: '#474747',
+    shadowOffset: { width: 0, height: 0 },
+  },
+  budStatusDown: {
+    backgroundColor: '#13CC84',
+    shadowColor: '#00FF9E',
+  },
+  budStatusOut: {
+    backgroundColor: '#EC3F52',
+    shadowColor: '#FF001C',
+  }
 })
