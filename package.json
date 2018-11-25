@@ -4,8 +4,11 @@
   "dependencies": {
     "expo": "^28.0.0",
     "firebase": "^5.2.0",
+    "merge": "^1.2.1",
+    "morgan": "^1.9.1",
     "react": "16.3.1",
     "react-native": "https://github.com/expo/react-native/archive/sdk-28.0.0.tar.gz",
-    "react-native-pose": "^0.3.0"
+    "react-native-pose": "^0.3.0",
+    "ws": "^6.1.2"
   }
 }
