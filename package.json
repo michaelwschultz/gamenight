@@ -2,7 +2,7 @@
   "main": "node_modules/expo/AppEntry.js",
   "private": true,
   "dependencies": {
-    "expo": "^28.0.0",
+    "expo": "^46.0.14",
     "firebase": "^5.2.0",
     "merge": "^1.2.1",
     "morgan": "^1.9.1",
